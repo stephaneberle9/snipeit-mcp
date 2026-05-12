@@ -82,6 +82,10 @@ uv sync
 
 ### 3. Configure environment variables
 
+The server supports two authentication modes; pick one.
+
+#### Mode A — API key (stdio or HTTP, single shared identity)
+
 Create a `.env` file:
 
 ```env
@@ -101,6 +105,46 @@ SNIPEIT_ALLOWED_TOOLS=manage_assets,system_info  # Optional: restrict exposed to
 2. Navigate to your user profile (top right menu)
 3. Go to "Manage API Keys" or "Personal Access Tokens"
 4. Generate a new token with required permissions
+
+#### Mode B — Interactive OAuth login (HTTP only, per-user identity)
+
+In this mode the MCP server runs as a web service and acts as an OAuth proxy in
+front of Snipe-IT's built-in [Laravel Passport](https://snipe-it.readme.io/) provider.
+Each user logs in to Snipe-IT (going through your normal SAML / SSO if configured)
+and the MCP server uses that user's own access token for every tool call.
+
+**One-time Snipe-IT setup** (admin):
+1. Visit `https://your-snipeit-instance.com/admin/oauth`
+2. Create a new OAuth client
+3. Set the redirect URI to `https://your-mcp-public-url/auth/callback`
+4. Note the generated client ID and secret
+
+**Environment variables:**
+
+```env
+SNIPEIT_URL=https://your-snipeit-instance.com
+SNIPEIT_OAUTH_CLIENT_ID=...                  # from /admin/oauth
+SNIPEIT_OAUTH_CLIENT_SECRET=...              # from /admin/oauth
+SNIPEIT_MCP_BASE_URL=https://your-mcp-public-url
+MCP_TRANSPORT=http
+MCP_PORT=8000
+# MCP_HOST=0.0.0.0                            # defaults to 127.0.0.1
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SNIPEIT_URL` | Yes | Your Snipe-IT instance URL |
+| `SNIPEIT_OAUTH_CLIENT_ID` | Yes | OAuth client ID from `/admin/oauth` |
+| `SNIPEIT_OAUTH_CLIENT_SECRET` | Yes | OAuth client secret from `/admin/oauth` |
+| `SNIPEIT_MCP_BASE_URL` | Yes | Public URL where this MCP server is reachable (used in the OAuth callback) |
+| `SNIPEIT_MCP_REDIRECT_PATH` | No | Override OAuth callback path (default `/auth/callback`) |
+| `MCP_TRANSPORT` | Yes | Must be `http` for OAuth mode |
+| `MCP_HOST` | No | Bind address (default `127.0.0.1`; use `0.0.0.0` behind a reverse proxy) |
+| `MCP_PORT` | Yes | TCP port for the HTTP server |
+| `LOG_LEVEL` | No | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` (default `INFO`) |
+
+OAuth mode requires HTTP transport — starting with `MCP_TRANSPORT=stdio` while
+OAuth env vars are set fails at startup with a clear error.
 
 ## MCP Client Configuration
 

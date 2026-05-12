@@ -4,6 +4,13 @@ This module owns the singleton :class:`fastmcp.FastMCP` instance. Tool modules
 under :mod:`snipeit_mcp.tools` import ``mcp`` from here and attach themselves
 via ``@mcp.tool(...)`` decorators. Importing this module triggers registration
 of every tool by importing :mod:`snipeit_mcp.tools` at the bottom.
+
+The FastMCP instance is constructed with a :class:`SnipeITOAuthProvider` when
+OAuth env vars are set (interactive web mode); otherwise it runs without an
+auth provider and tools authenticate via the static ``SNIPEIT_TOKEN`` env var.
+Logging is *not* configured here — that lives in :mod:`snipeit_mcp.logging_config`
+and must be called from the entry point before this module is imported, so
+stdio JSON-RPC traffic on stdout stays uncorrupted.
 """
 
 import logging
@@ -11,13 +18,43 @@ import os
 
 from fastmcp import FastMCP
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+from .auth import SnipeITOAuthProvider
+from .config import AuthMode, SnipeITAuthConfig
+
 logger = logging.getLogger(__name__)
 
-mcp = FastMCP(name="Snipe-IT MCP Server")
+
+def _build_auth_provider() -> SnipeITOAuthProvider | None:
+    """Construct an OAuth provider from env if OAuth mode is configured.
+
+    Returns ``None`` in API-key mode, when SNIPEIT_URL is missing, or when only
+    a partial OAuth config is present. Errors from
+    :meth:`SnipeITAuthConfig.from_env` are swallowed at import time so the
+    server can still start in degraded modes (e.g. for ``--help``); the real
+    validation runs in ``__main__.main`` via ``SnipeITAuthConfig.from_env()``.
+    """
+    try:
+        cfg = SnipeITAuthConfig.from_env()
+    except Exception:  # noqa: BLE001 — config errors deferred to entry point
+        return None
+    if cfg.mode != AuthMode.OAUTH:
+        return None
+    assert cfg.oauth_client_id and cfg.oauth_client_secret and cfg.oauth_base_url
+    return SnipeITOAuthProvider(
+        snipeit_url=cfg.url,
+        client_id=cfg.oauth_client_id,
+        client_secret=cfg.oauth_client_secret,
+        base_url=cfg.oauth_base_url,
+        redirect_path=cfg.oauth_redirect_path,
+    )
+
+
+_auth_provider = _build_auth_provider()
+if _auth_provider is not None:
+    logger.info("Snipe-IT OAuth provider configured (interactive login enabled)")
+    mcp = FastMCP(name="Snipe-IT MCP Server", auth=_auth_provider)
+else:
+    mcp = FastMCP(name="Snipe-IT MCP Server")
 
 # Import tool modules so their @mcp.tool decorators run and register tools on `mcp`.
 # Placed after `mcp` is defined so submodules can import it from this module.
