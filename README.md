@@ -143,12 +143,17 @@ MCP_PORT=8000
 | `MCP_PORT` | Yes | TCP port for the HTTP server |
 | `LOG_LEVEL` | No | `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL` (default `INFO`) |
 
-OAuth mode requires HTTP transport — starting with `MCP_TRANSPORT=stdio` while
-OAuth env vars are set fails at startup with a clear error.
+> [!NOTE]
+> OAuth mode requires HTTP transport — starting with `MCP_TRANSPORT=stdio`
+> while OAuth env vars are set fails at startup with a clear error.
 
 ## MCP Client Configuration
 
-### Claude Desktop / Claude Code
+The right configuration depends on whether the server runs in **API-key mode** (stdio,
+local, one shared identity) or **OAuth mode** (HTTP, remote, per-user identity).
+See the previous section for how the server picks between them.
+
+### Claude Desktop / Claude Code — API-key mode (stdio)
 
 Add to your MCP configuration file:
 
@@ -198,9 +203,84 @@ Add to your MCP configuration file:
 }
 ```
 
+### Claude Desktop / Claude Code — OAuth mode (via `mcp-remote`)
+
+When the server runs in OAuth mode it speaks HTTP, not stdio, so it cannot be
+launched directly by Claude Desktop. Use [`mcp-remote`](https://www.npmjs.com/package/mcp-remote)
+as a stdio bridge — it handles Dynamic Client Registration, opens the browser
+for interactive login, caches the resulting tokens, and refreshes them
+transparently. The server must already be running and reachable at the URL below
+(e.g. on a VM, behind a reverse proxy, or on `localhost` for dev).
+
+```json
+{
+  "mcpServers": {
+    "snipeit": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://your-mcp-public-url/mcp"
+      ]
+    }
+  }
+}
+```
+
+> [!NOTE]
+> No `SNIPEIT_*` env vars belong here — the server holds them. The first
+> connection opens a browser tab for Snipe-IT login (going through your SSO if
+> configured); subsequent connections reuse the cached refresh token.
+
+### Claude.ai web (OAuth mode only)
+
+Open https://claude.ai → Settings → **Connectors** → **Add custom connector**.
+Paste the public URL of your running MCP server (e.g. `https://your-mcp-public-url/mcp`)
+and follow the OAuth prompt.
+
+> [!IMPORTANT]
+> Claude.ai web requires the MCP server to be reachable from the public
+> internet over HTTPS — `localhost` and unencrypted HTTP do not work here.
+> Use the [`mcp-remote` bridge](#claude-desktop--claude-code--oauth-mode-via-mcp-remote)
+> instead if you only have a localhost deployment.
+
 ### Cursor
 
-Add to your Cursor MCP settings with the same configuration format as above.
+Add to your Cursor MCP settings using the same JSON shape as the Claude Desktop
+examples above — stdio (API-key) or `mcp-remote` bridge (OAuth) — whichever matches
+your server mode.
+
+### MCP Inspector (debugging)
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+Then in the Inspector UI:
+
+- **Transport Type**: `Streamable HTTP`
+- **URL**: your server's `/mcp` endpoint
+- **Connection Type**: must be **Via Proxy**, not **Direct**
+
+> [!NOTE]
+> **Why "Via Proxy"?** The Inspector UI is a static frontend served at
+> `http://localhost:6274` and the MCP server lives at a different origin
+> (e.g. `http://localhost:8000`). In **Direct** mode the browser tries to talk
+> to the MCP server itself, which fails for two compounding reasons: (a)
+> FastMCP doesn't emit CORS headers for the Inspector origin, so requests are
+> blocked client-side, and (b) the OAuth redirect flow needs server-side state
+> the browser-only client can't keep. **Via Proxy** routes traffic through
+> Inspector's own backend (at `localhost:6277`), which is same-origin from
+> the MCP server's perspective and handles OAuth state correctly.
+
+<!-- separates the two adjacent GH alerts -->
+
+> [!WARNING]
+> Leave **Client ID** and **Client Secret** in the OAuth panel **empty** —
+> Inspector will perform Dynamic Client Registration with the MCP server.
+> Pasting your Snipe-IT (upstream) client_id and secret there is the most
+> common misconfiguration; those credentials belong only in the server's
+> `.env`, not in any MCP client.
 
 ## Available Tools (39 Total)
 
