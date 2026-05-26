@@ -154,6 +154,17 @@ class SnipeITDirectAPI:
 
         Defaults sort=id, order=asc for stable offset pagination.
         """
+        return self.list_page(endpoint, limit, offset, search, sort, order)[0]
+
+    def list_page(self, endpoint: str, limit: int = 50, offset: int = 0,
+                  search: str | None = None, sort: str | None = None,
+                  order: str | None = None,
+                  extra_params: dict | None = None):
+        """List resources with pagination, returning (rows, total).
+
+        `total` is the Snipe-IT-reported full count so callers can compute
+        has_more. Defaults sort=id, order=asc for stable offset pagination.
+        """
         params = {"limit": limit, "offset": offset,
                   "sort": sort or "id", "order": order or "asc"}
         if search:
@@ -2942,7 +2953,7 @@ def license_files(
                 "action": "list",
                 "license_id": license_id,
                 "count": len(files_list),
-                "files": files_list
+                "files": files_list,
             }
 
         elif action == "download":
@@ -3259,7 +3270,7 @@ def accessory_operations(
                 "action": "list_checkouts",
                 "accessory_id": accessory_id,
                 "count": len(checkouts_list),
-                "checkouts": checkouts_list
+                "checkouts": checkouts_list,
             }
 
     except SnipeITNotFoundError as e:
@@ -5372,7 +5383,7 @@ def model_files(
                 "action": "list",
                 "model_id": model_id,
                 "count": len(files_list),
-                "files": files_list
+                "files": files_list,
             }
 
         elif action == "download":
