@@ -341,7 +341,7 @@ def license_files(
                 # Use a separate request without JSON content type for file upload
                 url = f"{api.base_url}/api/v1/licenses/{license_id}/upload"
                 headers = {
-                    "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                    "Authorization": api.headers["Authorization"],
                     "Accept": "application/json",
                 }
                 response = requests.post(url, headers=headers, files=files)
@@ -388,7 +388,7 @@ def license_files(
             # Get the file download URL and download
             url = f"{api.base_url}/api/v1/licenses/{license_id}/uploads/{file_id}"
             headers = {
-                "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                "Authorization": api.headers["Authorization"],
                 "Accept": "application/octet-stream",
             }
             response = requests.get(url, headers=headers)

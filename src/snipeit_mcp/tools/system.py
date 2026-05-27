@@ -102,7 +102,7 @@ def manage_backups(
 
             url = f"{api.base_url}/api/v1/settings/backups/download/{filename}"
             headers = {
-                "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                "Authorization": api.headers["Authorization"],
                 "Accept": "application/octet-stream",
             }
             response = requests.get(url, headers=headers)
