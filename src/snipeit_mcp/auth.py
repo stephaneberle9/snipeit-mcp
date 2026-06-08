@@ -10,6 +10,7 @@ belongs to the user described in the response body.
 from __future__ import annotations
 
 import logging
+import time
 
 import httpx
 from fastmcp.server.auth import TokenVerifier
@@ -17,6 +18,17 @@ from fastmcp.server.auth.auth import AccessToken
 from fastmcp.server.auth.oauth_proxy import OAuthProxy
 
 logger = logging.getLogger(__name__)
+
+
+def passport_endpoints(snipeit_url: str) -> tuple[str, str]:
+    """Return the ``(authorize, token)`` Passport endpoint URLs for a Snipe-IT base URL.
+
+    Strips a trailing slash from ``snipeit_url`` and appends Snipe-IT's standard
+    Laravel Passport paths. Extracted as a pure function so the URL-building logic
+    can be tested without reaching into FastMCP's private ``OAuthProxy`` internals.
+    """
+    base = snipeit_url.rstrip("/")
+    return f"{base}/oauth/authorize", f"{base}/oauth/token"
 
 
 class SnipeITTokenVerifier(TokenVerifier):
@@ -33,13 +45,23 @@ class SnipeITTokenVerifier(TokenVerifier):
         *,
         snipeit_url: str,
         timeout_seconds: int = 10,
+        cache_ttl_seconds: int = 60,
         required_scopes: list[str] | None = None,
     ):
         super().__init__(required_scopes=required_scopes)
         self.snipeit_url = snipeit_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        # Short-lived positive-result cache so we don't hit /users/me on every
+        # single tool call. Keyed on the opaque token; only successful (200)
+        # validations are cached. Set ``cache_ttl_seconds=0`` to disable.
+        self.cache_ttl_seconds = cache_ttl_seconds
+        self._cache: dict[str, tuple[float, AccessToken]] = {}
 
     async def verify_token(self, token: str) -> AccessToken | None:
+        cached = self._cache_get(token)
+        if cached is not None:
+            return cached
+
         url = f"{self.snipeit_url}/api/v1/users/me"
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as http:
@@ -70,12 +92,33 @@ class SnipeITTokenVerifier(TokenVerifier):
             return None
 
         # Passport doesn't expose scopes through /users/me — return an empty list.
-        return AccessToken(
+        access = AccessToken(
             token=token,
             client_id=str(user.get("id", "snipeit-user")),
             scopes=[],
             expires_at=None,
         )
+        self._cache_put(token, access)
+        return access
+
+    def _cache_get(self, token: str) -> AccessToken | None:
+        """Return a non-expired cached :class:`AccessToken` for ``token``, or ``None``."""
+        if self.cache_ttl_seconds <= 0:
+            return None
+        entry = self._cache.get(token)
+        if entry is None:
+            return None
+        expires_at, access = entry
+        if time.monotonic() >= expires_at:
+            self._cache.pop(token, None)
+            return None
+        return access
+
+    def _cache_put(self, token: str, access: AccessToken) -> None:
+        """Cache a successful validation for ``cache_ttl_seconds``."""
+        if self.cache_ttl_seconds <= 0:
+            return
+        self._cache[token] = (time.monotonic() + self.cache_ttl_seconds, access)
 
 
 class SnipeITOAuthProvider(OAuthProxy):
@@ -99,16 +142,18 @@ class SnipeITOAuthProvider(OAuthProxy):
         redirect_path: str = "/auth/callback",
         required_scopes: list[str] | None = None,
         timeout_seconds: int = 10,
+        cache_ttl_seconds: int = 60,
     ):
-        snipeit_url = snipeit_url.rstrip("/")
+        authorize_url, token_url = passport_endpoints(snipeit_url)
         super().__init__(
-            upstream_authorization_endpoint=f"{snipeit_url}/oauth/authorize",
-            upstream_token_endpoint=f"{snipeit_url}/oauth/token",
+            upstream_authorization_endpoint=authorize_url,
+            upstream_token_endpoint=token_url,
             upstream_client_id=client_id,
             upstream_client_secret=client_secret,
             token_verifier=SnipeITTokenVerifier(
                 snipeit_url=snipeit_url,
                 timeout_seconds=timeout_seconds,
+                cache_ttl_seconds=cache_ttl_seconds,
                 required_scopes=required_scopes,
             ),
             base_url=base_url,

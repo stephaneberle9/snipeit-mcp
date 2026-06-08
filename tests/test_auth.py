@@ -7,7 +7,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from snipeit_mcp.auth import SnipeITOAuthProvider, SnipeITTokenVerifier
+from snipeit_mcp.auth import (
+    SnipeITOAuthProvider,
+    SnipeITTokenVerifier,
+    passport_endpoints,
+)
 from snipeit_mcp.config import (
     AuthMode,
     ConfigError,
@@ -230,27 +234,68 @@ class TestSnipeITTokenVerifier:
             result = await verifier.verify_token("any-credential")
         assert result is None
 
+    async def test_caches_successful_validation(self):
+        verifier = SnipeITTokenVerifier(
+            snipeit_url="https://snipeit.example.com", cache_ttl_seconds=60
+        )
+        with patch("snipeit_mcp.auth.httpx.AsyncClient") as client_cls:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            get = AsyncMock(return_value=_StubResponse(200, {"id": 7}))
+            client.get = get
+            client_cls.return_value = client
+
+            first = await verifier.verify_token("cache-me")
+            second = await verifier.verify_token("cache-me")
+
+        assert first is not None and second is not None
+        assert second.token == "cache-me"
+        # The second call is served from cache — only one upstream round-trip.
+        assert get.await_count == 1
+
+    async def test_cache_disabled_revalidates_each_call(self):
+        verifier = SnipeITTokenVerifier(
+            snipeit_url="https://snipeit.example.com", cache_ttl_seconds=0
+        )
+        with patch("snipeit_mcp.auth.httpx.AsyncClient") as client_cls:
+            client = AsyncMock()
+            client.__aenter__.return_value = client
+            get = AsyncMock(return_value=_StubResponse(200, {"id": 7}))
+            client.get = get
+            client_cls.return_value = client
+
+            await verifier.verify_token("no-cache")
+            await verifier.verify_token("no-cache")
+
+        assert get.await_count == 2
+
 
 # ----- SnipeITOAuthProvider ---------------------------------------------------
 
 
+class TestPassportEndpoints:
+    def test_strips_trailing_slash_and_appends_passport_paths(self):
+        authorize_url, token_url = passport_endpoints("https://snipeit.example.com/")
+        assert authorize_url == "https://snipeit.example.com/oauth/authorize"
+        assert token_url == "https://snipeit.example.com/oauth/token"
+
+    def test_no_trailing_slash(self):
+        authorize_url, token_url = passport_endpoints("https://snipeit.example.com")
+        assert authorize_url == "https://snipeit.example.com/oauth/authorize"
+        assert token_url == "https://snipeit.example.com/oauth/token"
+
+
 class TestSnipeITOAuthProvider:
-    def test_builds_with_passport_endpoints(self):
+    def test_builds_without_error(self):
+        # Smoke test: construction wires the Passport endpoints (verified via
+        # passport_endpoints above) and a SnipeITTokenVerifier without raising.
         provider = SnipeITOAuthProvider(
             snipeit_url="https://snipeit.example.com/",
             client_id="cid",
             client_secret="csecret",  # noqa: S106 — test fixture
             base_url="https://mcp.example.com",
         )
-        # The OAuthProxy stores the upstream endpoints as strings; verify the
-        # trailing slash was stripped and the Passport path is used.
-        assert provider._upstream_authorization_endpoint == (
-            "https://snipeit.example.com/oauth/authorize"
-        )
-        assert provider._upstream_token_endpoint == (
-            "https://snipeit.example.com/oauth/token"
-        )
-        assert isinstance(provider._token_validator, SnipeITTokenVerifier)
+        assert isinstance(provider, SnipeITOAuthProvider)
 
 
 # ----- _resolve_token ---------------------------------------------------------

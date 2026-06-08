@@ -51,6 +51,8 @@ def _build_auth_provider() -> SnipeITOAuthProvider | None:
         client_secret=cfg.oauth_client_secret,
         base_url=cfg.oauth_base_url,
         redirect_path=cfg.oauth_redirect_path,
+        timeout_seconds=cfg.oauth_timeout_seconds,
+        cache_ttl_seconds=cfg.oauth_cache_ttl_seconds,
     )
 
 

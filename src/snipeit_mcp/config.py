@@ -25,6 +25,17 @@ class ConfigError(ValueError):
     """Raised when configuration is missing or inconsistent."""
 
 
+def _env_int(name: str, default: int) -> int:
+    """Read an integer env var, falling back to ``default`` when unset/blank."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a valid integer, got: {raw}") from exc
+
+
 class TransportType(str, Enum):
     """Supported MCP transport types."""
 
@@ -107,6 +118,9 @@ class SnipeITAuthConfig:
     oauth_client_secret: str | None = None
     oauth_base_url: str | None = None
     oauth_redirect_path: str = "/auth/callback"
+    # Upstream /users/me validation tuning (OAuth mode only)
+    oauth_timeout_seconds: int = 10
+    oauth_cache_ttl_seconds: int = 60
 
     @classmethod
     def from_env(cls) -> SnipeITAuthConfig:
@@ -143,6 +157,8 @@ class SnipeITAuthConfig:
                 oauth_client_secret=client_secret,
                 oauth_base_url=base_url,
                 oauth_redirect_path=os.getenv("SNIPEIT_MCP_REDIRECT_PATH", "/auth/callback"),
+                oauth_timeout_seconds=_env_int("SNIPEIT_OAUTH_TIMEOUT", 10),
+                oauth_cache_ttl_seconds=_env_int("SNIPEIT_OAUTH_CACHE_TTL", 60),
             )
 
         if token:
