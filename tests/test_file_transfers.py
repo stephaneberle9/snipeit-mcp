@@ -29,6 +29,7 @@ class TestModelFilesTransfer:
         from snipeit_mcp import model_files
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         upload_path = tmp_path / "manual.pdf"
         upload_path.write_bytes(b"pdf-bytes")
 
@@ -48,6 +49,7 @@ class TestModelFilesTransfer:
         from snipeit_mcp import model_files
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         save_path = tmp_path / "out" / "manual.pdf"
 
         with patch("snipeit_mcp.tools.foundational.requests") as req:
@@ -69,6 +71,7 @@ class TestLicenseFilesTransfer:
         from snipeit_mcp import license_files
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         upload_path = tmp_path / "license.pdf"
         upload_path.write_bytes(b"license-bytes")
 
@@ -88,6 +91,7 @@ class TestLicenseFilesTransfer:
         from snipeit_mcp import license_files
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         save_path = tmp_path / "license.pdf"
 
         with patch("snipeit_mcp.tools.licenses.requests") as req:
@@ -109,6 +113,7 @@ class TestManageImportsUpload:
         from snipeit_mcp import manage_imports
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         upload_path = tmp_path / "assets.csv"
         upload_path.write_text("asset_tag,name\nA1,Laptop\n")
 
@@ -130,6 +135,7 @@ class TestManageBackupsDownload:
         from snipeit_mcp import manage_backups
 
         mock_direct_api.base_url = "https://test.snipeit.com"
+        mock_direct_api.headers = {"Authorization": "Bearer test-token-12345"}
         save_path = tmp_path / "backups" / "backup.sql"
 
         with patch("snipeit_mcp.tools.system.requests") as req:

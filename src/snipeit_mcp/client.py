@@ -5,6 +5,11 @@ Tool modules access the credentials and clients defined here via
 ``client.get_direct_api()``. The qualified-access pattern lets tests patch
 ``snipeit_mcp.client.get_snipeit_client`` / ``...get_direct_api`` once and have
 the patch propagate to every tool module.
+
+The bearer credential used for each call is resolved per-request by
+:func:`_resolve_token`: in OAuth mode the authenticated user's own token is
+pulled from the FastMCP request context; otherwise the static
+``SNIPEIT_TOKEN`` env var is used. The same code path works for both modes.
 """
 
 from __future__ import annotations
@@ -20,33 +25,63 @@ from snipeit.exceptions import (
     SnipeITValidationError,
 )
 
-# Get Snipe-IT configuration from environment variables
-SNIPEIT_URL = os.getenv("SNIPEIT_URL")
-SNIPEIT_TOKEN = os.getenv("SNIPEIT_TOKEN")
+def _resolve_url() -> str | None:
+    """Return the configured Snipe-IT base URL, read fresh from the env each call.
+
+    Reading per-call (rather than capturing at import time) means tests that
+    patch ``os.environ`` after the module is imported still take effect.
+    """
+    return os.getenv("SNIPEIT_URL")
+
+
+def _resolve_token() -> str | None:
+    """Return the bearer credential to use for the current call.
+
+    Prefers the authenticated user's OAuth credential from the FastMCP request
+    context when present (OAuth mode), falling back to the ``SNIPEIT_TOKEN``
+    env var (API-key mode / headless use / tests). Returns ``None`` when
+    neither is available; callers raise :class:`SnipeITException` in that case.
+    """
+    try:
+        from fastmcp.server.dependencies import get_access_token
+    except ImportError:
+        access = None
+    else:
+        # Returns None when there's no authenticated request context (stdio mode
+        # without auth, or in tests) — it does not raise.
+        access = get_access_token()
+    if access is not None:
+        return access.token
+    return os.getenv("SNIPEIT_TOKEN")
+
+
+def _require_url_and_token() -> tuple[str, str]:
+    url = _resolve_url()
+    creds = _resolve_token()
+    if not url or not creds:
+        raise SnipeITException(
+            "Snipe-IT credentials not configured. "
+            "Please set SNIPEIT_URL and either SNIPEIT_TOKEN (API key mode) or "
+            "the SNIPEIT_OAUTH_CLIENT_* env vars plus SNIPEIT_MCP_BASE_URL "
+            "(OAuth mode)."
+        )
+    return url, creds
 
 
 def get_snipeit_client() -> SnipeIT:
-    """Get or create a Snipe-IT client instance."""
-    if not SNIPEIT_URL or not SNIPEIT_TOKEN:
-        raise SnipeITException(
-            "Snipe-IT credentials not configured. "
-            "Please set SNIPEIT_URL and SNIPEIT_TOKEN environment variables."
-        )
-    return SnipeIT(url=SNIPEIT_URL, token=SNIPEIT_TOKEN)
+    """Get or create a Snipe-IT client instance for the current call."""
+    url, creds = _require_url_and_token()
+    return SnipeIT(url=url, token=creds)
 
 
 class SnipeITDirectAPI:
     """Direct API client for endpoints not supported by the snipeit-python-api library."""
 
     def __init__(self):
-        if not SNIPEIT_URL or not SNIPEIT_TOKEN:
-            raise SnipeITException(
-                "Snipe-IT credentials not configured. "
-                "Please set SNIPEIT_URL and SNIPEIT_TOKEN environment variables."
-            )
-        self.base_url = SNIPEIT_URL.rstrip("/")
+        url, creds = _require_url_and_token()
+        self.base_url = url.rstrip("/")
         self.headers = {
-            "Authorization": f"Bearer {SNIPEIT_TOKEN}",
+            "Authorization": f"Bearer {creds}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }

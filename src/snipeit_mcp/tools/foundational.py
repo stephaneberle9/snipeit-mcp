@@ -1244,7 +1244,7 @@ def model_files(
                 files = {"file": (filename, f)}
                 url = f"{api.base_url}/api/v1/models/{model_id}/files"
                 headers = {
-                    "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                    "Authorization": api.headers["Authorization"],
                     "Accept": "application/json",
                 }
                 response = requests.post(url, headers=headers, files=files)
@@ -1290,7 +1290,7 @@ def model_files(
 
             url = f"{api.base_url}/api/v1/models/{model_id}/files/{file_id}"
             headers = {
-                "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                "Authorization": api.headers["Authorization"],
                 "Accept": "application/octet-stream",
             }
             response = requests.get(url, headers=headers)

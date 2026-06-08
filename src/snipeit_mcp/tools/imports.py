@@ -95,7 +95,7 @@ def manage_imports(
                 files = {"file": (filename, f, "text/csv")}
                 url = f"{api.base_url}/api/v1/imports"
                 headers = {
-                    "Authorization": f"Bearer {_client.SNIPEIT_TOKEN}",
+                    "Authorization": api.headers["Authorization"],
                     "Accept": "application/json",
                 }
                 response = requests.post(url, headers=headers, files=files)
