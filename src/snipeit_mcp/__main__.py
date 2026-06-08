@@ -38,10 +38,9 @@ def main() -> None:
         print(f"Configuration error: {exc}", file=sys.stderr)
         sys.exit(2)
 
-    # OAuth implies HTTP transport — auth.validate_with_transport already
-    # verified this; if HTTP was not explicitly requested but OAuth is in use,
-    # we still need to swap stdio for HTTP somehow. Surfacing it as a config
-    # error lets the user choose their port explicitly instead of guessing.
+    # OAuth implies HTTP transport — validate_with_transport above already
+    # rejected the OAuth+stdio combination, so by this point the transport is
+    # consistent with the auth mode.
 
     from .mcp_server import mcp  # noqa: PLC0415 — lazy import after logging+config
 

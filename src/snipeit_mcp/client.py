@@ -62,7 +62,8 @@ def _require_url_and_token() -> tuple[str, str]:
         raise SnipeITException(
             "Snipe-IT credentials not configured. "
             "Please set SNIPEIT_URL and either SNIPEIT_TOKEN (API key mode) or "
-            "the SNIPEIT_OAUTH_CLIENT_* env vars (OAuth mode)."
+            "the SNIPEIT_OAUTH_CLIENT_* env vars plus SNIPEIT_MCP_BASE_URL "
+            "(OAuth mode)."
         )
     return url, creds
 
