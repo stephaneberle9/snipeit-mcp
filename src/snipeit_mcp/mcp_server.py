@@ -19,7 +19,7 @@ import os
 from fastmcp import FastMCP
 
 from .auth import SnipeITOAuthProvider
-from .config import AuthMode, SnipeITAuthConfig
+from .config import AuthMode, ConfigError, SnipeITAuthConfig
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,19 @@ def _build_auth_provider() -> SnipeITOAuthProvider | None:
     """Construct an OAuth provider from env if OAuth mode is configured.
 
     Returns ``None`` in API-key mode, when SNIPEIT_URL is missing, or when only
-    a partial OAuth config is present. Errors from
-    :meth:`SnipeITAuthConfig.from_env` are swallowed at import time so the
-    server can still start in degraded modes (e.g. for ``--help``); the real
-    validation runs in ``__main__.main`` via ``SnipeITAuthConfig.from_env()``.
+    a partial OAuth config is present. :class:`ConfigError` from
+    :meth:`SnipeITAuthConfig.from_env` is swallowed at import time so the server
+    can still start in degraded modes (e.g. for ``--help``); the real validation
+    runs in ``__main__.main`` via ``SnipeITAuthConfig.from_env()``.
+
+    Only ``ConfigError`` is caught: any *other* exception (e.g. an OAuthProxy
+    construction failure) must propagate loudly. Swallowing it would silently
+    drop the auth provider and start an OAuth-intended, internet-facing HTTP
+    server with no authentication layer.
     """
     try:
         cfg = SnipeITAuthConfig.from_env()
-    except Exception:  # noqa: BLE001 — config errors deferred to entry point
+    except ConfigError:  # deferred to entry point, which validates and reports
         return None
     if cfg.mode != AuthMode.OAUTH:
         return None
