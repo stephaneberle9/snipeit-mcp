@@ -47,11 +47,9 @@ def _resolve_token() -> str | None:
     except ImportError:
         access = None
     else:
-        try:
-            access = get_access_token()
-        except LookupError:
-            # No request context (e.g. stdio mode without auth, or in tests).
-            access = None
+        # Returns None when there's no authenticated request context (stdio mode
+        # without auth, or in tests) — it does not raise.
+        access = get_access_token()
     if access is not None:
         return access.token
     return os.getenv("SNIPEIT_TOKEN")
