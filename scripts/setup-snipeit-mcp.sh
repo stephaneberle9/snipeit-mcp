@@ -4,8 +4,7 @@
 #
 # Run as root (or via sudo) on a fresh VM. Idempotent — re-running is safe.
 #
-#   git clone --branch feature/interactive-oauth-login \
-#       https://github.com/stephaneberle9/snipeit-mcp.git /opt/snipeit-mcp
+#   git clone https://github.com/jameshgordy/snipeit-mcp.git /opt/snipeit-mcp
 #   # Optional: drop a .env at the repo root with the deployment-specific values
 #   # (SNIPEIT_URL, SNIPEIT_MCP_BASE_URL, SNIPEIT_OAUTH_CLIENT_ID/_SECRET).
 #   # Setup seeds /etc/snipeit-mcp.env from it; missing keys become __FILL_ME__.
@@ -144,7 +143,7 @@ log "Installing systemd unit at $UNIT_FILE ..."
 cat >"$UNIT_FILE" <<EOF
 [Unit]
 Description=Snipe-IT MCP Server (OAuth, HTTP transport)
-Documentation=https://github.com/stephaneberle9/snipeit-mcp
+Documentation=https://github.com/jameshgordy/snipeit-mcp
 After=network-online.target
 Wants=network-online.target
 

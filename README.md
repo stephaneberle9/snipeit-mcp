@@ -161,8 +161,7 @@ shape for OAuth mode), the repo ships two helper scripts under `scripts/`:
 
 ```bash
 # 1. Clone the source tree
-sudo git clone --branch feature/interactive-oauth-login \
-    https://github.com/stephaneberle9/snipeit-mcp.git /opt/snipeit-mcp
+sudo git clone https://github.com/jameshgordy/snipeit-mcp.git /opt/snipeit-mcp
 
 # 2. (Optional) Drop a .env at the repo root so setup can seed
 #    SNIPEIT_URL / SNIPEIT_OAUTH_CLIENT_ID / _SECRET / SNIPEIT_MCP_BASE_URL.
