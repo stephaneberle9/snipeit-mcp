@@ -37,7 +37,11 @@ UV_BIN=/usr/local/bin/uv
 # Environment= directives. Override at install time with e.g.
 # `sudo MCP_PORT=9000 bash setup-snipeit-mcp.sh`.
 MCP_TRANSPORT=${MCP_TRANSPORT:-http}
-MCP_HOST=${MCP_HOST:-0.0.0.0}
+# Bind to loopback by default — bearer-token traffic runs over plain HTTP here
+# (TLS is expected to terminate at a reverse proxy in front). Expose on all
+# interfaces only when you deliberately want that, e.g. behind a proxy on a
+# different host: `sudo MCP_HOST=0.0.0.0 bash setup-snipeit-mcp.sh`.
+MCP_HOST=${MCP_HOST:-127.0.0.1}
 MCP_PORT=${MCP_PORT:-8000}
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 FASTMCP_HOME=${FASTMCP_HOME:-$STATE_DIR}

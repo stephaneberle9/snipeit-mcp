@@ -201,7 +201,7 @@ sudo bash /opt/snipeit-mcp/scripts/update-snipeit-mcp.sh
 | `ENV_FILE` | `/etc/snipeit-mcp.env` | Generated env file |
 | `SEED_ENV_FILE` | `$SOURCE_DIR/.env` | Optional seed for `SNIPEIT_*` values |
 | `MCP_TRANSPORT` | `http` | Always `http` for OAuth mode |
-| `MCP_HOST` | `0.0.0.0` | Bind address (tighten to `127.0.0.1` if a reverse proxy is on the same VM) |
+| `MCP_HOST` | `127.0.0.1` | Bind address. Loopback by default; set `MCP_HOST=0.0.0.0` to expose on all interfaces (e.g. a reverse proxy on a different host) |
 | `MCP_PORT` | `8000` | TCP port |
 | `LOG_LEVEL` | `INFO` |  |
 
